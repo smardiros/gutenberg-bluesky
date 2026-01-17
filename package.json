@@ -1,0 +1,19 @@
+{
+  "name": "johnson-bot",
+  "version": "1.0.0",
+  "description": "Bluesky bot posting Boswell's Life of Johnson paragraph by paragraph",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dry-run": "tsx src/index.ts --dry-run"
+  },
+  "dependencies": {
+    "@atproto/api": "^0.13.20",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.12",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}
