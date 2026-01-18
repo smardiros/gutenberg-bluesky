@@ -137,4 +137,85 @@ export function splitIntoPostChunks(paragraph: string): string[] {
   return chunks;
 }
 
+const MAX_THREAD_LENGTH = 4;
+
+function hasUnclosedQuote(text: string): boolean {
+  // Track quote state more carefully to avoid false positives from apostrophes
+  // Opening single quote: after whitespace/start, before letter
+  // Closing single quote: after letter, before whitespace/punctuation/end
+  // Possessive/contraction: letter + ' + letter (e.g., "don't", "Johnson's")
+
+  let inDoubleQuote = false;
+  let inSingleQuote = false;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const prev = text[i - 1];
+    const next = text[i + 1];
+
+    if (char === '"') {
+      inDoubleQuote = !inDoubleQuote;
+    } else if (char === "'") {
+      // Skip if it looks like a contraction or possessive
+      // (letter before and letter after, or letter before and 's' after)
+      const letterBefore = prev && /[a-zA-Z]/.test(prev);
+      const letterAfter = next && /[a-zA-Z]/.test(next);
+
+      if (letterBefore && letterAfter) {
+        // Contraction like "don't" - skip
+        continue;
+      }
+      if (letterBefore && (!next || /[\s.,;:!?]/.test(next))) {
+        // Possessive like "Johnson's" at end or before punctuation - skip
+        continue;
+      }
+
+      // Otherwise treat as quote
+      inSingleQuote = !inSingleQuote;
+    }
+  }
+
+  return inDoubleQuote || inSingleQuote;
+}
+
+function isInsideQuote(chunks: string[], endIndex: number): boolean {
+  // Check if we're inside a quote by looking at all text up to endIndex
+  const textSoFar = chunks.slice(0, endIndex + 1).join(" ");
+  return hasUnclosedQuote(textSoFar);
+}
+
+export function groupChunksIntoThreads(chunks: string[]): string[][] {
+  if (chunks.length <= MAX_THREAD_LENGTH) {
+    return [chunks];
+  }
+
+  const threads: string[][] = [];
+  let currentThread: string[] = [];
+
+  for (let i = 0; i < chunks.length; i++) {
+    currentThread.push(chunks[i]);
+
+    // Check if we should break here
+    if (currentThread.length >= MAX_THREAD_LENGTH) {
+      // Don't break if we're inside a quote
+      if (!isInsideQuote(chunks, i) || i === chunks.length - 1) {
+        threads.push(currentThread);
+        currentThread = [];
+      }
+      // If inside quote and thread is getting too long (>6), force break anyway
+      else if (currentThread.length > MAX_THREAD_LENGTH + 2) {
+        threads.push(currentThread);
+        currentThread = [];
+      }
+    }
+  }
+
+  // Don't forget remaining chunks
+  if (currentThread.length > 0) {
+    threads.push(currentThread);
+  }
+
+  return threads;
+}
+
 export { countGraphemes };

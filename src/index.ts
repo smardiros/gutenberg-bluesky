@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { getParagraph, getTotalParagraphs } from "./text-parser.js";
-import { splitIntoPostChunks, countGraphemes } from "./splitter.js";
+import { splitIntoPostChunks, countGraphemes, groupChunksIntoThreads } from "./splitter.js";
 import { post } from "./bluesky.js";
 import { loadState, saveState } from "./state.js";
 
@@ -90,12 +90,19 @@ async function main() {
     allChunks.push(...chunks);
   }
 
-  console.log(`\n=== Total: ${count} paragraph(s), ${allChunks.length} post(s) ===\n`);
+  // Group chunks into threads of max 4, avoiding breaks within quotes
+  const threads = groupChunksIntoThreads(allChunks);
 
-  for (let i = 0; i < allChunks.length; i++) {
-    console.log(`[${i + 1}/${allChunks.length}] (${countGraphemes(allChunks[i])} chars):`);
-    console.log(allChunks[i]);
-    console.log();
+  console.log(`\n=== Total: ${count} paragraph(s), ${allChunks.length} post(s), ${threads.length} thread(s) ===\n`);
+
+  for (let t = 0; t < threads.length; t++) {
+    const thread = threads[t];
+    console.log(`--- Thread ${t + 1}/${threads.length} (${thread.length} posts) ---`);
+    for (let i = 0; i < thread.length; i++) {
+      console.log(`  [${i + 1}/${thread.length}] (${countGraphemes(thread[i])} chars):`);
+      console.log(`  ${thread[i]}`);
+      console.log();
+    }
   }
 
   if (options.dryRun) {
@@ -103,15 +110,19 @@ async function main() {
     return;
   }
 
-  // Post to Bluesky
-  console.log("Posting to Bluesky...");
-  const result = await post(allChunks);
-  console.log(`Posted! URI: ${result.uri}`);
+  // Post each thread to Bluesky
+  let lastUri = "";
+  for (let t = 0; t < threads.length; t++) {
+    console.log(`Posting thread ${t + 1}/${threads.length}...`);
+    const result = await post(threads[t]);
+    console.log(`Posted! URI: ${result.uri}`);
+    lastUri = result.uri;
+  }
 
   // Update state
   const newPosition = paragraphIndex + count;
   state.currentParagraph = newPosition;
-  state.lastPostUri = result.uri;
+  state.lastPostUri = lastUri;
   state.lastPostAt = new Date().toISOString();
   await saveState(state);
   console.log(`Advanced to paragraph ${newPosition + 1} (consumed ${count} paragraph(s))`);
