@@ -137,7 +137,7 @@ export function splitIntoPostChunks(paragraph: string): string[] {
   return chunks;
 }
 
-const MAX_THREAD_LENGTH = 4;
+const MAX_THREAD_LENGTH = 3;
 
 function hasUnclosedQuote(text: string): boolean {
   // Track quote state more carefully to avoid false positives from apostrophes
